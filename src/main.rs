@@ -2,9 +2,11 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use cpu::Cpu;
+use input::handle_input;
 
 mod cpu;
 mod font;
+mod input;
 
 const WINDOW_SIZE: (f32, f32) = (640.0, 320.0);
 const TILE_SIZE: f32 = 10.0;
@@ -23,7 +25,8 @@ fn main() {
         .add_startup_system(spawn_camera)
         .add_system(remove_pixel)
         .add_system(draw_pixel.after(remove_pixel))
-        .add_system(get_input)
+        .add_system(handle_input)
+        // .add_system(get_input)
         .run()
 }
 fn remove_pixel(mut commands: Commands, pixels: Query<(Entity, &Pixel)>, cpu: Res<Cpu>) {
