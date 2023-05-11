@@ -23,7 +23,7 @@ impl Default for Cpu {
             opcode: 0,
             V: [0; 16],
             I: 0,
-            pc: 0,
+            pc: 0x200,
             display: [[0; 64]; 32],
             delay_timer: 0,
             sound_timer: 0,
