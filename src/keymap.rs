@@ -1,4 +1,4 @@
-use super::cpu::Cpu;
+use super::Cpu;
 use bevy::prelude::*;
 
 /*            Remap

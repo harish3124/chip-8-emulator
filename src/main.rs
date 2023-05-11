@@ -2,11 +2,13 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use cpu::Cpu;
-use input::handle_input;
+use keymap::handle_input;
+use timers::tick_timer;
 
 mod cpu;
 mod font;
-mod input;
+mod keymap;
+mod timers;
 
 const WINDOW_SIZE: (f32, f32) = (640.0, 320.0);
 const TILE_SIZE: f32 = 10.0;
@@ -26,7 +28,8 @@ fn main() {
         .add_system(remove_pixel)
         .add_system(draw_pixel.after(remove_pixel))
         .add_system(handle_input)
-        // .add_system(get_input)
+        .add_system(tick_timer)
+        .add_system(get_input)
         .run()
 }
 fn remove_pixel(mut commands: Commands, pixels: Query<(Entity, &Pixel)>, cpu: Res<Cpu>) {
@@ -43,7 +46,8 @@ fn draw_pixel(mut commands: Commands, mut cpu: ResMut<Cpu>) {
     if cpu.redraw {
         for row in 0..32 {
             for col in 0..64 {
-                if cpu.display[row][col] == 1 {
+                // (31 - row) to set (0,0) at top left
+                if cpu.display[(31 - row)][col] == 1 {
                     commands.spawn((
                         SpriteBundle {
                             sprite: Sprite {
@@ -60,7 +64,10 @@ fn draw_pixel(mut commands: Commands, mut cpu: ResMut<Cpu>) {
                             ),
                             ..default()
                         },
-                        Pixel { row: row, col: col },
+                        Pixel {
+                            row: (31 - row),
+                            col: col,
+                        },
                     ));
                 }
             }
@@ -87,6 +94,8 @@ fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Primar
 // DEBUG
 fn get_input(input: Res<Input<KeyCode>>, mut cpu: ResMut<Cpu>) {
     if input.just_pressed(KeyCode::Up) {
+        cpu.delay_timer = 255;
+        println!("timer");
         if cpu.display[10][20] == 0 {
             cpu.display[10][20] = 1;
         } else {
