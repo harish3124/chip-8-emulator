@@ -1,4 +1,4 @@
-use bevy::prelude::Resource;
+use bevy::prelude::{ResMut, Resource};
 
 #[derive(Resource)]
 pub struct Cpu {
@@ -33,4 +33,11 @@ impl Default for Cpu {
             redraw: false,
         }
     }
+}
+
+pub fn cycle(mut cpu: ResMut<Cpu>) {
+    cpu.opcode =
+        u16::from(cpu.memory[cpu.pc as usize]) << 8 | u16::from(cpu.memory[cpu.pc as usize + 1]);
+
+    // TODO execute opcodes
 }
