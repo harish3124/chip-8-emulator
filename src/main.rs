@@ -31,11 +31,11 @@ fn main() {
         .add_startup_system(spawn_camera)
         .add_startup_system(load_rom)
         .add_startup_system(load_font)
+        .add_system(cycle)
         .add_system(remove_pixel)
         .add_system(draw_pixel.after(remove_pixel))
         .add_system(handle_input)
         .add_system(tick_timer)
-        .add_system(cycle)
         .add_system(get_input)
         .run();
 }
