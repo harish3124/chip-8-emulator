@@ -46,6 +46,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
             // Clear the display.
             if cpu.opcode == 0x00E0 {
                 cpu.display = [[0; 64]; 32];
+                cpu.redraw = true;
                 cpu.pc += 2;
             }
 
@@ -261,7 +262,146 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
             cpu.V[x] = rand_num & kk;
         }
 
-        // TODO Continue With 0xDxyn
+        // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+        // Sprites are 8 pixels wide and N pixels high
+        0xD000 => {
+            // TODO finish this
+            let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
+            let y = ((cpu.opcode & 0x00F0) >> 4) as usize;
+            let n = (cpu.opcode & 0x000F) as usize;
+
+            let mut tmp_addr: usize;
+
+            cpu.V[0xF] = 0;
+
+            for row in 0..n {
+                tmp_addr = (row * 8);
+                for col in 0..8 {
+                    // TODO this is wrong load as BCD
+                    if cpu.memory[cpu.I as usize + tmp_addr] > 0 {
+                        cpu.display[y + row][x + col] = 1
+                    } else if cpu.display[y + row][x + col] == 1 {
+                        cpu.display[y + row][x + col] = 0;
+                        cpu.V[0xF] = 1
+                    }
+                }
+            }
+            print!("{:?}", cpu.display);
+            cpu.redraw = true;
+
+            // cpu.pc += 2
+        }
+
+        0xE000 => {
+            let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
+            match cpu.opcode & 0x00FF {
+                // Skip next instruction if key with the value of Vx is pressed.
+                0x009E => {
+                    if cpu.keypad[cpu.V[x] as usize] == 1 {
+                        cpu.pc += 2
+                    }
+                    cpu.pc += 2
+                }
+
+                // Skip next instruction if key with the value of Vx is not pressed.
+                0x00A1 => {
+                    if cpu.keypad[cpu.V[x] as usize] != 1 {
+                        cpu.pc += 2
+                    }
+                    cpu.pc += 2
+                }
+                _ => (),
+            }
+        }
+
+        0xF000 => {
+            let x = ((cpu.opcode & 0x0f00) >> 8) as usize;
+            match cpu.opcode & 0x00ff {
+                // Set Vx = delay timer value.
+                0x0007 => {
+                    cpu.V[x] = cpu.delay_timer;
+                    cpu.pc += 2
+                }
+
+                // Wait for a key press, store the value of the key in Vx.
+                0x000A => {
+                    let mut i = 0;
+                    while i < 16 {
+                        if cpu.keypad[i] == 1 {
+                            cpu.V[x] = i as u8;
+                            cpu.pc += 2;
+                            break;
+                        }
+                        i += 1
+                    }
+                }
+
+                // Set delay timer = Vx.
+                0x0015 => {
+                    cpu.delay_timer = cpu.V[x];
+                    cpu.pc += 2
+                }
+
+                // Set sound timer = Vx.
+                0x0018 => {
+                    cpu.sound_timer = cpu.V[x];
+                    cpu.pc += 2
+                }
+
+                // Set I = I + Vx.
+                0x001E => {
+                    cpu.I = cpu.I + cpu.V[x] as u16;
+                    cpu.pc += 2
+                }
+
+                // Set I = location of sprite for digit Vx.
+                0x0029 => {
+                    cpu.I = 0x200 + (cpu.V[x] as u16 * 5 as u16);
+                    cpu.pc += 2
+                }
+
+                // Store BCD representation of Vx in memory locations I, I+1, and I+2.
+                0x0033 => {
+                    let hundreds = cpu.V[x] / 100;
+                    let tens = (cpu.V[x] - hundreds) / 10;
+                    let ones = cpu.V[x] - tens;
+
+                    let i = cpu.I.clone() as usize;
+                    cpu.memory[i] = hundreds;
+                    cpu.memory[i + 1] = tens;
+                    cpu.memory[i + 2] = ones;
+
+                    cpu.pc += 2
+                }
+
+                // Store registers V0 through Vx in memory starting at location I.
+                0x0055 => {
+                    let addr = cpu.I.clone() as usize;
+                    let mut i = 0;
+
+                    while i < 16 {
+                        cpu.memory[addr + i] = cpu.V[i];
+                        i += 1
+                    }
+
+                    cpu.pc += 2
+                }
+
+                // Read registers V0 through Vx from memory starting at location I.
+                0x0065 => {
+                    let addr = cpu.I.clone() as usize;
+                    let mut i = 0;
+
+                    while i < 16 {
+                        cpu.V[i] = cpu.memory[addr + i];
+                        i += 1
+                    }
+
+                    cpu.pc += 2
+                }
+                _ => (),
+            }
+        }
         _ => (),
     }
 
