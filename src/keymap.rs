@@ -16,7 +16,7 @@ Keypad                   Keyboard
 
 pub fn handle_input(input: Res<Input<KeyCode>>, mut cpu: ResMut<Cpu>) {
     if input.pressed(KeyCode::Key1) {
-        cpu.keypad[1] = 1
+        cpu.keypad[1] = 1;
     } else {
         cpu.keypad[1] = 0
     }

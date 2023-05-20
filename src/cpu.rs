@@ -40,7 +40,6 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
     cpu.opcode =
         u16::from(cpu.memory[cpu.pc as usize]) << 8 | u16::from(cpu.memory[cpu.pc as usize + 1]);
 
-    // TODO this does not work, problem with matching
     match cpu.opcode & 0xF000 {
         0x0000 => {
             // Clear the display.
@@ -265,31 +264,30 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
         // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
         // Sprites are 8 pixels wide and N pixels high
         0xD000 => {
-            // TODO finish this
             let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
             let y = ((cpu.opcode & 0x00F0) >> 4) as usize;
             let n = (cpu.opcode & 0x000F) as usize;
 
-            let mut tmp_addr: usize;
-
             cpu.V[0xF] = 0;
 
+            let vx = cpu.V[x] as usize;
+            let vy = cpu.V[y] as usize;
+
             for row in 0..n {
-                tmp_addr = (row * 8);
+                let sprite = cpu.memory[cpu.I as usize + row];
+
                 for col in 0..8 {
-                    // TODO this is wrong load as BCD
-                    if cpu.memory[cpu.I as usize + tmp_addr] > 0 {
-                        cpu.display[y + row][x + col] = 1
-                    } else if cpu.display[y + row][x + col] == 1 {
-                        cpu.display[y + row][x + col] = 0;
-                        cpu.V[0xF] = 1
+                    const msb: u8 = 0x80;
+
+                    if sprite & (msb >> col) != 0 {
+                        cpu.display[vy + row][vx + col] ^= 1;
+                        cpu.V[0xF] = cpu.display[vy + row][vx + col] ^ 1;
                     }
                 }
             }
-            print!("{:?}", cpu.display);
             cpu.redraw = true;
 
-            // cpu.pc += 2
+            cpu.pc += 2
         }
 
         0xE000 => {
@@ -305,6 +303,8 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
 
                 // Skip next instruction if key with the value of Vx is not pressed.
                 0x00A1 => {
+                    println!("key: {}", cpu.V[x]);
+
                     if cpu.keypad[cpu.V[x] as usize] != 1 {
                         cpu.pc += 2
                     }
@@ -379,7 +379,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                     let addr = cpu.I.clone() as usize;
                     let mut i = 0;
 
-                    while i < 16 {
+                    while i < x {
                         cpu.memory[addr + i] = cpu.V[i];
                         i += 1
                     }
@@ -392,18 +392,18 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                     let addr = cpu.I.clone() as usize;
                     let mut i = 0;
 
-                    while i < 16 {
+                    while i < x {
                         cpu.V[i] = cpu.memory[addr + i];
                         i += 1
                     }
-
                     cpu.pc += 2
                 }
                 _ => (),
             }
         }
-        _ => (),
+        _ => println!("Unknown Opcode: {}", cpu.opcode),
     }
 
+    // TODO remove
     // println!("{}", cpu.opcode)
 }
