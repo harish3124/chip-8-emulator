@@ -51,8 +51,8 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
 
             // Return from a subroutine.
             if cpu.opcode == 0x00EE {
-                cpu.pc = cpu.stack[cpu.sp as usize];
                 cpu.sp -= 1;
+                cpu.pc = cpu.stack[cpu.sp as usize];
             }
         }
 
@@ -63,9 +63,9 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
 
         // Call subroutine at nnn.
         0x2000 => {
-            cpu.sp += 1;
             let new_sp = cpu.sp as usize;
             cpu.stack[new_sp] = cpu.pc.clone();
+            cpu.sp += 1;
             cpu.pc = cpu.opcode & 0x0FFF;
         }
 
@@ -93,7 +93,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
             let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
             let y = ((cpu.opcode & 0x00F0) >> 4) as usize;
 
-            if cpu.V[x] != cpu.V[y] {
+            if cpu.V[x] == cpu.V[y] {
                 cpu.pc += 2
             }
             cpu.pc += 2;
@@ -134,7 +134,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                 let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
                 let y = ((cpu.opcode & 0x00F0) >> 4) as usize;
 
-                cpu.V[x] = cpu.V[x] | cpu.V[y];
+                cpu.V[x] |= cpu.V[y];
 
                 cpu.pc += 2;
             }
@@ -144,7 +144,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                 let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
                 let y = ((cpu.opcode & 0x00F0) >> 4) as usize;
 
-                cpu.V[x] = cpu.V[x] & cpu.V[y];
+                cpu.V[x] &= cpu.V[y];
 
                 cpu.pc += 2;
             }
@@ -154,7 +154,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                 let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
                 let y = ((cpu.opcode & 0x00F0) >> 4) as usize;
 
-                cpu.V[x] = cpu.V[x] ^ cpu.V[y];
+                cpu.V[x] ^= cpu.V[y];
 
                 cpu.pc += 2;
             }
@@ -186,7 +186,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                 } else {
                     cpu.V[0xF] = 0
                 }
-                cpu.V[x] = cpu.V[x] - cpu.V[y];
+                cpu.V[x] -= cpu.V[y];
 
                 cpu.pc += 2;
             }
@@ -195,7 +195,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
             0x0006 => {
                 let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
 
-                cpu.V[0xF] = cpu.V[x] & 0x000F;
+                cpu.V[0xF] = cpu.V[x] & 0x1;
                 cpu.V[x] >>= 1;
 
                 cpu.pc += 2;
@@ -220,7 +220,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
             0x000E => {
                 let x = ((cpu.opcode & 0x0F00) >> 8) as usize;
 
-                cpu.V[0xF] = cpu.V[x] & 0x000F;
+                cpu.V[0xF] = cpu.V[x] >> 7;
                 cpu.V[x] <<= 1;
 
                 cpu.pc += 2;
@@ -259,8 +259,10 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
             let kk = (cpu.opcode & 0x00FF) as u8;
 
             cpu.V[x] = rand_num & kk;
+            cpu.pc += 2;
         }
 
+        // TODO check this block
         // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
         // Sprites are 8 pixels wide and N pixels high
         0xD000 => {
@@ -305,7 +307,7 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                 0x00A1 => {
                     println!("key: {}", cpu.V[x]);
 
-                    if cpu.keypad[cpu.V[x] as usize] != 1 {
+                    if cpu.keypad[cpu.V[x] as usize] == 0 {
                         cpu.pc += 2
                     }
                     cpu.pc += 2
@@ -325,14 +327,12 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
 
                 // Wait for a key press, store the value of the key in Vx.
                 0x000A => {
-                    let mut i = 0;
-                    while i < 16 {
+                    for i in 0..16 {
                         if cpu.keypad[i] == 1 {
                             cpu.V[x] = i as u8;
                             cpu.pc += 2;
                             break;
                         }
-                        i += 1
                     }
                 }
 
@@ -350,7 +350,13 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
 
                 // Set I = I + Vx.
                 0x001E => {
-                    cpu.I = cpu.I + cpu.V[x] as u16;
+                    cpu.I += cpu.V[x] as u16;
+
+                    if cpu.I > 0xFFF {
+                        cpu.V[0xF] = 1;
+                    } else {
+                        cpu.V[0xF] = 0;
+                    }
                     cpu.pc += 2
                 }
 
@@ -379,11 +385,12 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                     let addr = cpu.I.clone() as usize;
                     let mut i = 0;
 
-                    while i < x {
+                    while i <= x {
                         cpu.memory[addr + i] = cpu.V[i];
                         i += 1
                     }
 
+                    cpu.I += x as u16 + 1;
                     cpu.pc += 2
                 }
 
@@ -392,10 +399,11 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
                     let addr = cpu.I.clone() as usize;
                     let mut i = 0;
 
-                    while i < x {
+                    while i <= x {
                         cpu.V[i] = cpu.memory[addr + i];
                         i += 1
                     }
+                    cpu.I += x as u16 + 1;
                     cpu.pc += 2
                 }
                 _ => (),
@@ -405,5 +413,5 @@ pub fn cycle(mut cpu: ResMut<Cpu>) {
     }
 
     // TODO remove
-    // println!("{}", cpu.opcode)
+    println!("{}", cpu.opcode)
 }
